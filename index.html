@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Money Manager — Advanced</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#f6f8fb;--card:#ffffff;--muted:#6b7280;--accent:#ff5722;--danger:#ef4444;--success:#10b981;--glass: rgba(255,255,255,0.6);
+      --radius:14px;--shadow: 0 6px 18px rgba(20,20,40,0.06);
+    }
+    [data-theme="dark"]{
+      --bg:#0b1020;--card:#071021;--muted:#9aa4bf;--accent:#60a5fa;--glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box;font-family:Inter, system-ui, -apple-system, sans-serif}
+    body{margin:0;background:linear-gradient(180deg,var(--bg),#fff);min-height:100vh;padding:24px;color:var(--muted)}
+    .app{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:24px}
+    header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+
+    .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+    .dashboard{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .balance{grid-column:1/span2;display:flex;align-items:center;justify-content:space-between}
+    .balance h2{margin:0;font-size:20px;color:#111827}
+    .amount{font-size:28px;font-weight:700;color:#111827}
+    .controls{display:flex;gap:8px}
+    button{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:10px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--muted);border:1px solid rgba(0,0,0,0.06)}
+    .form{display:flex;gap:8px;align-items:center}
+    input,select{padding:10px;border-radius:10px;border:1px solid #e6e9ef;background:transparent}
+
+    .transactions{margin-top:14px}
+    .tx{display:flex;justify-content:space-between;padding:10px;border-radius:10px;border:1px solid rgba(0,0,0,0.03);margin-bottom:8px}
+    .tx .left{display:flex;gap:12px;align-items:center}
+    .pill{padding:6px 10px;border-radius:999px;background:var(--glass);font-size:13px}
+
+    .right-col{display:flex;flex-direction:column;gap:14px}
+    canvas{max-width:100%;height:220px}
+
+    .small{font-size:13px;color:var(--muted)}
+    .muted{color:var(--muted)}
+    .flex{display:flex;gap:8px;align-items:center}
+
+    footer{grid-column:1/-1;margin-top:14px;color:var(--muted);font-size:13px;text-align:center}
+
+    @media(max-width:980px){.app{grid-template-columns:1fr;padding:16px}.balance{flex-direction:column;align-items:flex-start}.right-col{order:2}}
+  </style>
+</head>
+<body data-theme="light">
+  <div class="app">
+    <header>
+      <div>
+        <h1 style="margin:0;font-size:18px;color:#111827">Money Manager — Advanced</h1>
+        <div class="small">Clean. Responsive. Local-first.</div>
+      </div>
+      <div class="controls">
+        <label class="small">Theme
+          <select id="themeSwitch" style="margin-left:8px;padding:8px;border-radius:8px">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+        <button id="exportBtn" title="Export JSON">Export</button>
+        <button id="importBtn" class="ghost" title="Import JSON">Import</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="dashboard">
+        <div class="balance">
+          <div>
+            <h2>Available Balance</h2>
+            <div class="amount" id="balanceAmt">₹0.00</div>
+            <div class="small muted">Income: <span id="totalIncome">₹0</span> · Expense: <span id="totalExpense">₹0</span> · Investments: <span id="totalInvest">₹0</span></div>
+          </div>
+          <div style="text-align:right">
+            <div class="flex">
+              <button id="addIncomeBtn">+ Income</button>
+              <button id="addExpenseBtn">- Expense</button>
+              <button id="addInvestBtn">☆ Invest</button>
+            </div>
+            <div style="margin-top:8px">
+              <label class="small">Hide balance <input type="checkbox" id="hideBalance"></label>
+            </div>
+          </div>
+        </div>
+
+        <div style="grid-column:1/-1;margin-top:12px">
+          <div style="display:flex;gap:10px;align-items:center">
+            <input id="search" placeholder="Search note or category" style="flex:1" />
+            <select id="filterType"><option value="all">All</option><option value="income">Income</option><option value="expense">Expense</option><option value="investment">Investment</option></select>
+            <input type="month" id="filterMonth" />
+            <button id="clearFilters" class="ghost">Clear</button>
+          </div>
+          <div class="transactions" id="txList"></div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="right-col">
+      <div class="card">
+        <h3 style="margin-top:0">Charts</h3>
+        <canvas id="pieChart"></canvas>
+        <div style="height:12px"></div>
+        <canvas id="lineChart"></canvas>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Budget & Goals</h3>
+        <div class="small">Set monthly budget</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="budgetAmt" placeholder="₹ Monthly budget" />
+          <button id="saveBudget" class="ghost">Save</button>
+        </div>
+        <div style="margin-top:12px">
+          <div class="small">Savings Goals</div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input id="goalName" placeholder="Goal name"/>
+            <input id="goalAmt" placeholder="₹ target"/>
+            <button id="addGoal" class="ghost">Add</button>
+          </div>
+          <div id="goalsList" style="margin-top:8px"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0">Settings</h3>
+        <div class="small">App PIN (4 digits)</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="pinInput" maxlength="4" placeholder="PIN" />
+          <button id="setPin" class="ghost">Set / Update</button>
+        </div>
+        <div style="margin-top:8px" class="small">Export and Import will download/upload JSON of your data. All data stored locally in browser.</div>
+      </div>
+    </aside>
+
+    <footer class="small muted">Built for you — local-first, private. Want cloud sync or mobile app? Ask me!</footer>
+  </div>
+
+  <input type="file" id="importFile" style="display:none" accept="application/json" />
+
+  <script>
+    // Data model & storage
+    const KEY = 'mm_v1_data';
+    let state = {
+      transactions: [], // {id, type: income|expense|investment, amount, category, note, date}
+      budget: 0,
+      goals: [], // {id,name,target,progress}
+      pinHash: null,
+      theme: 'light'
+    };
+
+    // Utilities
+    const el = id => document.getElementById(id);
+    const fmt = v => '₹' + Number(v||0).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+
+    // Crypto helper: sha-256 hex
+    async function sha256Hex(str){
+      const enc = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    // Load & Save
+    function save(){ localStorage.setItem(KEY, JSON.stringify(state)); renderAll(); }
+    function load(){ const s = localStorage.getItem(KEY); if(s) state = JSON.parse(s); renderAll(); }
+
+    // Transactions
+    function addTransaction(tx){ state.transactions.unshift(tx); save(); }
+    function removeTransaction(id){ state.transactions = state.transactions.filter(t=>t.id!==id); save(); }
+
+    // Render
+    function computeTotals(){
+      let income=0, expense=0, invest=0;
+      state.transactions.forEach(t=>{ if(t.type==='income') income+=Number(t.amount); if(t.type==='expense') expense+=Number(t.amount); if(t.type==='investment') invest+=Number(t.amount); });
+      return {income,expense,invest};
+    }
+
+    function renderTxList(){
+      const list = el('txList'); list.innerHTML='';
+      const q = el('search').value.toLowerCase(); const typeFilter = el('filterType').value; const month = el('filterMonth').value;
+      const items = state.transactions.filter(t=>{
+        if(typeFilter!=='all' && t.type!==typeFilter) return false;
+        if(month){ const d = new Date(t.date); const m = d.toISOString().slice(0,7); if(m!==month) return false; }
+        if(q){ return (t.note||'').toLowerCase().includes(q) || (t.category||'').toLowerCase().includes(q);
+        }
+        return true;
+      });
+      items.forEach(t=>{
+        const node = document.createElement('div'); node.className='tx';
+        node.innerHTML = `<div class="left"><div class="pill">${t.type}</div><div><div style="font-weight:600;color:#111827">${t.category||'—'}</div><div class="small">${new Date(t.date).toLocaleString()} · ${t.note||''}</div></div></div><div style="text-align:right"><div style="font-weight:700;color:${t.type==='expense'? 'var(--danger)': t.type==='income'?'var(--success)':'#111827'}">${t.type==='expense'?'-':''}${fmt(t.amount)}</div><div style="margin-top:6px"><button class="ghost" data-id="${t.id}">Delete</button></div></div>`;
+        list.appendChild(node);
+      });
+      // attach delete
+      list.querySelectorAll('button[data-id]').forEach(b=>b.addEventListener('click',e=>{ if(confirm('Delete this transaction?')){ removeTransaction(b.dataset.id); }}));
+    }
+
+    // Charts
+    let pieChart=null,lineChart=null;
+    function renderCharts(){
+      // pie by category (expenses only)
+      const expenses = state.transactions.filter(t=>t.type==='expense');
+      const byCat = {};
+      expenses.forEach(t=> byCat[t.category=(t.category||'Other')] = (byCat[t.category]||0)+Number(t.amount));
+      const labels = Object.keys(byCat).slice(0,8);
+      const data = labels.map(l=>byCat[l]);
+      if(!pieChart){ pieChart = new Chart(el('pieChart'),{type:'pie',data:{labels, datasets:[{data}]}, options:{responsive:true, plugins:{legend:{position:'bottom'}}}});
+      } else { pieChart.data.labels=labels; pieChart.data.datasets[0].data=data; pieChart.update(); }
+
+      // line chart month-wise expenses
+      const months = {};
+      state.transactions.forEach(t=>{ const dt = new Date(t.date); const m = dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0'); months[m] = months[m] || {income:0,expense:0,invest:0}; months[m][t.type]+=Number(t.amount); });
+      const ms = Object.keys(months).sort();
+      const inc = ms.map(m=>months[m].income||0); const exp = ms.map(m=>months[m].expense||0);
+      if(!lineChart){ lineChart = new Chart(el('lineChart'),{type:'line',data:{labels:ms, datasets:[{label:'Expense', data:exp, fill:false},{label:'Income', data:inc, fill:false}]}, options:{responsive:true}});
+      } else { lineChart.data.labels=ms; lineChart.data.datasets[0].data=exp; lineChart.data.datasets[1].data=inc; lineChart.update(); }
+    }
+
+    function renderGoals(){ const g = el('goalsList'); g.innerHTML=''; state.goals.forEach(goal=>{ const div = document.createElement('div'); div.className='tx'; div.innerHTML=`<div><div style="font-weight:600">${goal.name}</div><div class="small">Target ${fmt(goal.target)} · Progress ${fmt(goal.progress||0)}</div></div><div><div class="small">${Math.round(((goal.progress||0)/goal.target||0)*100)}%</div><div style="margin-top:6px"><button class="ghost" data-id="${goal.id}">Delete</button></div></div>`; g.appendChild(div); });
+      g.querySelectorAll('button[data-id]').forEach(b=>b.addEventListener('click',()=>{ if(confirm('Remove goal?')){ state.goals = state.goals.filter(x=>x.id!==b.dataset.id); save(); }})); }
+
+    function renderAll(){
+      // balance
+      const {income,expense,invest} = computeTotals();
+      el('totalIncome').innerText = fmt(income);
+      el('totalExpense').innerText = fmt(expense);
+      el('totalInvest').innerText = fmt(invest);
+      const balance = income - expense - invest;
+      const hide = el('hideBalance').checked;
+      el('balanceAmt').innerText = hide? '• • • •' : fmt(balance);
+
+      renderTxList(); renderCharts(); renderGoals();
+      // theme
+      document.body.setAttribute('data-theme', state.theme || 'light');
+      el('themeSwitch').value = state.theme || 'light';
+    }
+
+    // UI actions: modals as quick prompts (keeps single file simple)
+    async function promptAdd(type){
+      const amount = prompt(`Enter ${type} amount (numbers only)`);
+      if(!amount || isNaN(amount)) return alert('Invalid amount');
+      const category = prompt('Category (e.g. Food, Salary, Rent)') || (type==='income'?'Salary':'Other');
+      const note = prompt('Note (optional)')||'';
+      const date = new Date().toISOString();
+      const tx = {id:uid(), type, amount:Number(amount), category, note, date};
+      addTransaction(tx);
+    }
+
+    // Budget & goals
+    el('saveBudget')?.addEventListener('click',()=>{ state.budget = Number(el('budgetAmt').value)||0; save(); alert('Saved'); });
+    el('addGoal')?.addEventListener('click',()=>{ const name=el('goalName').value.trim(); const target=Number(el('goalAmt').value)||0; if(!name||!target) return alert('Fill both'); state.goals.push({id:uid(),name,target,progress:0}); save(); el('goalName').value=''; el('goalAmt').value=''; });
+
+    // Add buttons
+    el('addIncomeBtn').addEventListener('click',()=>promptAdd('income'));
+    el('addExpenseBtn').addEventListener('click',()=>promptAdd('expense'));
+    el('addInvestBtn').addEventListener('click',()=>promptAdd('investment'));
+
+    // Filters
+    ['search','filterType','filterMonth'].forEach(id=> el(id).addEventListener('input',renderAll));
+    el('clearFilters').addEventListener('click',()=>{ el('search').value=''; el('filterType').value='all'; el('filterMonth').value=''; renderAll(); });
+
+    // Export / Import
+    el('exportBtn').addEventListener('click',()=>{
+      const dataStr = JSON.stringify(state, null, 2);
+      const blob = new Blob([dataStr],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='money-manager-backup.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    el('importBtn').addEventListener('click',()=> el('importFile').click());
+    el('importFile').addEventListener('change', e=>{
+      const f = e.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = () => { try{ const obj = JSON.parse(reader.result); if(confirm('Replace local data with imported data?')){ state = obj; save(); } } catch(err){ alert('Invalid JSON'); }}; reader.readAsText(f);
+    });
+
+    // PIN
+    el('setPin').addEventListener('click', async ()=>{
+      const pin = el('pinInput').value.trim(); if(!/^[0-9]{4}$/.test(pin)) return alert('Enter 4 digits'); state.pinHash = await sha256Hex(pin); save(); el('pinInput').value=''; alert('PIN saved');
+    });
+
+    // hide balance validation (if PIN set)
+    el('hideBalance').addEventListener('change', async ()=>{
+      if(el('hideBalance').checked && state.pinHash){ const pin = prompt('Enter PIN to hide balance'); if(!pin) { el('hideBalance').checked=false; return; } const h = await sha256Hex(pin); if(h!==state.pinHash){ alert('Wrong PIN'); el('hideBalance').checked=false; return; } }
+      renderAll();
+    });
+
+    // Theme
+    el('themeSwitch').addEventListener('change', ()=>{ state.theme = el('themeSwitch').value; save(); });
+
+    // init
+    load();
+
+    // sample data if empty
+    if(state.transactions.length===0){ state.transactions = [
+      {id:uid(),type:'income',amount:50000,category:'Salary',note:'Monthly salary',date:new Date().toISOString()},
+      {id:uid(),type:'expense',amount:8500,category:'Rent',note:'October rent',date:new Date().toISOString()},
+      {id:uid(),type:'expense',amount:1200,category:'Groceries',note:'Weekly',date:new Date().toISOString()},
+      {id:uid(),type:'investment',amount:2000,category:'SIP',note:'monthly SIP',date:new Date().toISOString()}
+    ]; save(); }
+
+  </script>
+</body>
+</html>
